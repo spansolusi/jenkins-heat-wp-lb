@@ -1,0 +1,22 @@
+pipeline {
+    
+    agent any
+    
+    stages { 
+        
+        stage('Preparation') {
+            steps {
+                sh 'git clone https://github.com/spansolusi/jenkins-heat-wp-lb.git'
+            }
+        }
+       
+       stage('create WP-1') {
+           steps {
+               sh 'pwd'
+               sh '. /home/ubuntu/venv/openstack/bin/activate && . jenkins-heat-wp-lb/usr2-sard-openrc.sh && openstack stack create -f yaml -t jenkins-heat-wp-lb/heat-wordpress-db.yaml heat-wp-lb --wait && deactivate'
+           }
+       }
+        
+      
+    }
+}
