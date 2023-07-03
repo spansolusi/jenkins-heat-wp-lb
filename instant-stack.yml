@@ -67,7 +67,7 @@ resources:
       flavor: "m1.small"
       image: "nginx-hostname"
       availability_zone: nova 
-      key_name: key-test
+      key_name: sar-dem-key1-prj1
 
 ## Creating Instance 1 Port ##
   server1_port:
