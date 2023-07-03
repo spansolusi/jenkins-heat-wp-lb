@@ -1,0 +1,143 @@
+heat_template_version: 2021-04-16
+##Heat Stack to create whole internal network for instances, and Load Balancer, including the pool member and Floating IP Association from external
+#
+# READ ME
+# To Launch this stack, You need to have the following
+# External network named 'provider'
+# Image named 'nginx-hostname'
+# Flavor with name 'm1.small'
+# Key named 'key-test'
+#
+
+resources:
+  security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: allow-http
+      rules:
+         - { remote_ip_prefix: 0.0.0.0/0, direction: ingress, protocol: tcp, port_range_min: 80, port_range_max: 80}
+## Creating Router ##
+  router:
+    type: OS::Neutron::Router
+    properties:
+      name: "Router_test"
+      external_gateway_info:
+       network: provider
+
+## Attaching Internal Network Subnet to Router Interface ##
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router }
+      subnet: { get_resource: int_subnet }
+
+## Internal Network Creation ##
+  int_network:
+    type: OS::Neutron::Net
+    properties:
+      name: internal-215
+
+## Internal Network Subnet Creation ##
+  int_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: internal-subnet-215
+      network: { get_resource: int_network }
+      cidr: 10.214.215.0/24
+      enable_dhcp: true
+
+## Creating Load Balancer Floating IP ##
+  lb_fip: 
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: provider
+
+## Creating Load Balancer ##
+  lb_loadbalancer:
+    type: OS::Octavia::LoadBalancer
+    properties:
+      vip_subnet: {get_resource: int_subnet}
+
+## Creating Instance 1 ##
+  server_1: 
+    type: "OS::Nova::Server"
+    properties: 
+      networks: 
+        - port: {get_resource: server1_port}
+      flavor: "m1.small"
+      image: "nginx-hostname"
+      availability_zone: nova 
+      key_name: key-test
+
+## Creating Instance 1 Port ##
+  server1_port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups: 
+        - {get_resource: security_group}
+      network_id: { get_resource: int_network }
+      fixed_ips:
+        - subnet_id: { get_resource: int_subnet }
+
+## Creating Instance 2 ##
+  server_2: 
+    type: "OS::Nova::Server"
+    properties: 
+      networks: 
+        - port: {get_resource: server2_port}
+      flavor: "m1.small"
+      image: "nginx-hostname"
+      availability_zone: nova
+      key_name: key-test
+
+## Creating Instance 2 Port ##
+  server2_port:
+    type: OS::Neutron::Port
+    properties: 
+      security_groups: 
+        - {get_resource: security_group}
+      network_id: { get_resource: int_network }
+      fixed_ips:
+        - subnet_id: { get_resource: int_subnet }
+
+## Associating Floating IP to Load Balancer ##
+  lb_association:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: lb_fip }
+      port_id: {get_attr: [lb_loadbalancer, vip_port_id]}
+
+
+## Creating Load Balancer Listener ##
+  lb_listener:
+    type: OS::Octavia::Listener
+    properties:
+      protocol: HTTP
+      protocol_port: 80
+      default_pool: { get_resource: lb_pool }
+      loadbalancer: { get_resource: lb_loadbalancer }
+
+## Creating Load Balancer Pool ##
+  lb_pool:
+    type: OS::Octavia::Pool
+    properties:
+      lb_algorithm: ROUND_ROBIN
+      protocol: HTTP
+      loadbalancer: { get_resource: lb_loadbalancer }
+
+## Adding Load Balancer Pool Member ##
+  lb_member_1:
+    type: OS::Octavia::PoolMember
+    properties:
+      pool: { get_resource: lb_pool }
+      address: { get_attr: [server_1, first_address] }
+      protocol_port: 80
+
+## Adding Load Balancer Pool Member ##
+  lb_member_2:
+    type: OS::Octavia::PoolMember
+    properties:
+      pool: { get_resource: lb_pool }
+      address: { get_attr: [server_2, first_address] }
+      protocol_port: 80
+
