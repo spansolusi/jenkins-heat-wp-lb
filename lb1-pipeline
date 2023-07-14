@@ -1,0 +1,29 @@
+pipeline {
+    
+    agent any
+    
+    stages { 
+        
+        stage('Preparation') {
+            steps {
+                sh 'git clone https://github.com/spansolusi/jenkins-heat-wp-lb.git'
+            }
+        }
+       
+       stage('create LB-stack') {
+           steps {
+               sh 'pwd'
+               sh '. /home/ubuntu/venv/openstack/bin/activate && . jenkins-heat-wp-lb/demo-proj1rc.sh && openstack stack create -f yaml -t jenkins-heat-wp-lb/stack-lb-with-param.yaml --parameter "build_router=router_local" --parameter "internal_network=interlocal" --parameter "internal_network_cidr=10.1.0.0/24" --parameter "internal_network_subnet=sub-int-sub-local" --parameter "external=provider" lb-stack-param --wait && deactivate'
+           }
+       }
+        
+       stage('clean up') {
+           steps {
+               sh 'pwd'
+               sh 'rm -r /var/lib/jenkins/workspace/LB-1/jenkins-heat-wp-lb '
+           }
+       }
+        
+      
+    }
+}
